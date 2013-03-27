@@ -59,8 +59,6 @@ module GitExtract
   end
 
   def git_extract(dev, fs_type, tags = TAGS)
-    fs_type = :ext4
-
     fs = FS::file_system(fs_type, dev)
     fs.with_mount('./kernel_builds', :discard => true) do
       Dir.chdir('./kernel_builds') do
