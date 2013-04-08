@@ -73,25 +73,60 @@ class CacheTests < ThinpTestCase
 
   #--------------------------------
 
-  def do_fio(dev, fs_type)
+  def do_fio(dev, fs_type, outfile = "../fio.out")
     fs = FS::file_system(fs_type, dev)
     fs.format
 
     fs.with_mount('./fio_test', :discard => true) do
       Dir.chdir('./fio_test') do
-        ProcessControl.run("fio ../tests/cache/fio.config")
+        ProcessControl.run("fio ../tests/cache/fio.config --output=#{outfile}")
       end
     end
   end
 
   tag :cache_target
   def test_fio_cache
-    with_standard_cache(:cache_size => meg(1024),
+    with_standard_cache(:cache_size => meg(512),
                         :format => true,
                         :block_size => 512,
-                        :data_size => meg(1024),
+                        :data_size => gig(2),
                         :policy => Policy.new('mq')) do |cache|
       do_fio(cache, :ext4)
+    end
+  end
+
+  def test_fio_soak_test
+    subvolume_count = 4
+    subvolume_size = meg(256)
+
+    with_standard_cache(:cache_size => meg(256),
+                        :format => true,
+                        :block_size => 512,
+                        :data_size => gig(4),
+                        :policy => Policy.new('mq')) do |cache|
+
+      # now we divide this up into subvolumes
+      tvm = TinyVolumeManager::VM.new
+
+      if subvolume_count * subvolume_size > dev_size(cache)
+        raise RuntimeError, "data device not big enough"
+      end
+
+      tvm.add_allocation_volume(cache, 0, subvolume_count * subvolume_size)
+      1.upto(subvolume_count) do |n|
+        tvm.add_volume(linear_vol("linear_#{n}", subvolume_size))
+      end
+
+      # the test runs fio over each of these sub volumes in turn with
+      # a sleep in between for the cache to sort itself out.
+      1.upto(subvolume_count) do |n|
+        with_dev(tvm.table("linear_#{n}")) do |subvolume|
+          report_time("fio across subvolume #{n}", STDERR) do
+            do_fio(subvolume, :ext4, "../fio_#{n}.out")
+            wait_for_all_clean(cache)
+          end
+        end
+      end
     end
   end
 
@@ -175,8 +210,9 @@ class CacheTests < ThinpTestCase
 
   tag :cache_target
   def test_git_extract_cache_quick
-    do_git_extract_cache_quick(:policy => Policy.new('mq'),
+    do_git_extract_cache_quick(:policy => Policy.new('mq', :migration_threshold => 0),
                                :cache_size => meg(256),
+                               :block_size => 512,
                                :data_size => gig(2))
   end
 
@@ -357,11 +393,21 @@ class CacheTests < ThinpTestCase
   #--------------------------------
 
   def wait_for_all_clean(cache)
+    tid = Thread.new(cache) do |cache|
+      loop do
+        sleep(1)
+        status = CacheStatus.new(cache)
+        STDERR.puts "#{status.nr_dirty} dirty blocks"
+        break if status.nr_dirty == 0
+      end
+    end
+
     cache.event_tracker.wait(cache) do |cache|
       status = CacheStatus.new(cache)
-      STDERR.puts "#{status.nr_dirty} dirty blocks"
       status.nr_dirty == 0
     end
+
+    tid.join
   end
 
   def test_cleaner_policy
