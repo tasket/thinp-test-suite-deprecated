@@ -14,8 +14,7 @@ class CacheStatus
 
     @a = m[1].split
 
-    shift_int :md_used
-    shift_int :md_total
+    shift_ratio :md_used, :md_total
     shift_int :read_hits
     shift_int :read_misses
     shift_int :write_hits
@@ -52,6 +51,13 @@ class CacheStatus
   def shift_int(symbol)
     check_args(symbol)
     set_val(symbol, Integer(@a.shift))
+  end
+
+  def shift_ratio(sym1, sym2)
+    str = shift_(sym1)
+    a, b = str.split('/')
+    set_val(sym1, a.to_i)
+    set_val(sym2, b.to_i)
   end
 
   def shift_features(symbol)
