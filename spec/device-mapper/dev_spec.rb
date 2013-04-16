@@ -34,6 +34,10 @@ describe DM::DMDev do
     hands_down(:load, mock())
   end
 
+  it "should hand down load_ro" do
+    hands_down(:load_ro, mock())
+  end
+
   it "should hand down suspend" do
     hands_down(:suspend)
   end

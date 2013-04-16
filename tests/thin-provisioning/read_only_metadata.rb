@@ -1,0 +1,72 @@
+require 'config'
+require 'lib/blktrace'
+require 'lib/disk-units'
+require 'lib/log'
+require 'lib/process'
+require 'lib/utils'
+require 'lib/tags'
+require 'lib/thinp-test'
+
+#----------------------------------------------------------------
+
+class ReadOnlyMetadataTests < ThinpTestCase
+  include DiskUnits
+  include Tags
+  include TinyVolumeManager
+  include Utils
+
+  def test_rw_pool_fails_with_ro_metadata
+    tvm = VM.new
+
+    tvm.add_allocation_volume(@metadata_dev, 0, dev_size(@metadata_dev))
+    tvm.add_volume(linear_vol('metadata', meg(20)))
+
+    # First we format a pool, and create a thin in it
+    with_dev(tvm.table('metadata')) do |metadata|
+      stack = PoolStack.new(@dm, @data_dev, metadata, :data_size => gig(2))
+      stack.activate do |pool|
+        with_new_thin(pool, @volume_size, 0) do |thin|
+          wipe_device(thin)
+        end
+      end
+    end
+
+    # now we open it read-only, expecting to be unable to create a rw pool
+    with_ro_dev(tvm.table('metadata')) do |metadata|
+      stack = PoolStack.new(@dm, @data_dev, metadata, :data_size => gig(2))
+      expect do
+        stack.activate {|pool|}
+      end.to raise_error(RuntimeError)
+    end
+  end
+
+  def test_ro_pool_succeeds_with_ro_metadata
+    tvm = VM.new
+
+    tvm.add_allocation_volume(@metadata_dev, 0, dev_size(@metadata_dev))
+    tvm.add_volume(linear_vol('metadata', meg(20)))
+
+    # First we format a pool, and create a thin in it
+    with_dev(tvm.table('metadata')) do |metadata|
+      stack = PoolStack.new(@dm, @data_dev, metadata, :data_size => gig(2))
+      stack.activate do |pool|
+        with_new_thin(pool, @volume_size, 0) do |thin|
+          wipe_device(thin)
+        end
+      end
+    end
+
+    # now we open it read-only, expecting to be unable to create a rw pool
+    with_ro_dev(tvm.table('metadata')) do |metadata|
+      stack = PoolStack.new(@dm, @data_dev, metadata, :data_size => gig(2), :read_only => true)
+      stack.activate do |pool|
+        with_thin(pool, @volume_size, 0) do |thin|
+          # already fully provisioned, so we can access it
+          wipe_device(thin)
+        end
+      end
+    end
+  end
+end
+
+#----------------------------------------------------------------

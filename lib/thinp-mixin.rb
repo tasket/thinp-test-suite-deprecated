@@ -9,6 +9,8 @@ require 'lib/process'
 require 'lib/tvm'
 require 'lib/utils'
 
+require 'rspec'
+
 #----------------------------------------------------------------
 
 $prereqs = Prerequisites.requirements do

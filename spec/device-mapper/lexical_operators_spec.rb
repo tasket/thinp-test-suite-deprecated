@@ -44,6 +44,22 @@ describe DM::LexicalOperators do
     end
   end
 
+  describe "#with_ro_dev" do
+    it "should create, load_ro, resume, exec block, remove" do
+      table = mock_table
+
+      @dm.should_receive(:create).with(path(0)).ordered
+      @dm.should_receive(:load_ro).with(path(0), table).ordered
+      @dm.should_receive(:resume).with(path(0)).ordered
+      @dm.should_receive(:block_executed).ordered
+      @dm.should_receive(:remove).with(path(0)).ordered
+
+      with_ro_dev(table) do |dev|
+        @dm.block_executed
+      end
+    end
+  end
+
   describe "#with_devs" do
     it "should create several devices" do
       nr = 100

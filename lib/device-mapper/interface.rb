@@ -7,12 +7,22 @@ module DM
       ProcessControl.run("dmsetup create #{strip(path)} --notable")
     end
 
+    # FIXME: duplication
     def load(path, table)
       Utils::with_temp_file('dm-table') do |f|
         debug "writing table: #{table.to_embed}"
         f.puts table.to_s
         f.flush
         ProcessControl.run("dmsetup load #{strip(path)} #{f.path}")
+      end
+    end
+
+    def load_ro(path, table)
+      Utils::with_temp_file('dm-table') do |f|
+        debug "writing table: #{table.to_embed}"
+        f.puts table.to_s
+        f.flush
+        ProcessControl.run("dmsetup load --readonly #{strip(path)} #{f.path}")
       end
     end
 

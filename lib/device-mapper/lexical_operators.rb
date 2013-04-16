@@ -12,6 +12,12 @@ module DM
               &block)
     end
 
+    def with_ro_dev(table = nil, &block)
+      bracket(create(table, true),
+              lambda {|dev| dev.remove; dev.post_remove_check},
+              &block)
+    end
+
     def with_devs(*tables, &block)
       release = lambda do |devs|
         devs.reverse.each do |dev|
@@ -33,7 +39,7 @@ module DM
     end
 
     private
-    def create(table = nil)
+    def create(table = nil, read_only = false)
       path = create_path
       tidy = lambda {dm_interface.remove(path)}
 
@@ -41,7 +47,11 @@ module DM
       protect_(tidy) do
         dev = DMDev.new(path, dm_interface)
         unless table.nil?
-          dev.load table
+          if read_only
+            dev.load_ro(table)
+          else
+            dev.load(table)
+          end
           dev.resume
         end
         dev

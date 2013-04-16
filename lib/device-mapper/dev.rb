@@ -22,6 +22,11 @@ module DM
       @active_table = table
     end
 
+    def load_ro(table)
+      @interface.load_ro(path, table)
+      @active_table = table
+    end
+
     def suspend
       @interface.suspend(path)
     end
