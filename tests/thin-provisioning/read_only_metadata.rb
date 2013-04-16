@@ -15,28 +15,40 @@ class ReadOnlyMetadataTests < ThinpTestCase
   include TinyVolumeManager
   include Utils
 
+  def test_with_ro_dev_works
+    tvm = VM.new
+
+    tvm.add_allocation_volume(@metadata_dev, 0, dev_size(@metadata_dev))
+    tvm.add_volume(linear_vol('metadata', meg(20)))
+
+    # now we open it read-only, expecting to be unable to create a rw pool
+    with_ro_dev(tvm.table('metadata')) do |metadata|
+      expect {wipe_device(metadata)}.to raise_error(ExitError)
+    end
+  end
+
   def test_rw_pool_fails_with_ro_metadata
     tvm = VM.new
 
     tvm.add_allocation_volume(@metadata_dev, 0, dev_size(@metadata_dev))
     tvm.add_volume(linear_vol('metadata', meg(20)))
 
-    # First we format a pool, and create a thin in it
+    # First we format a pool
     with_dev(tvm.table('metadata')) do |metadata|
       stack = PoolStack.new(@dm, @data_dev, metadata, :data_size => gig(2))
-      stack.activate do |pool|
-        with_new_thin(pool, @volume_size, 0) do |thin|
-          wipe_device(thin)
-        end
-      end
+      stack.activate {|pool|}
     end
 
     # now we open it read-only, expecting to be unable to create a rw pool
     with_ro_dev(tvm.table('metadata')) do |metadata|
       stack = PoolStack.new(@dm, @data_dev, metadata, :data_size => gig(2))
       expect do
-        stack.activate {|pool|}
-      end.to raise_error(RuntimeError)
+        stack.activate do |pool|
+          with_new_thin(pool, @volume_size, 0) do |thin|
+            wipe_device(thin)
+          end
+        end
+      end.to raise_error
     end
   end
 
