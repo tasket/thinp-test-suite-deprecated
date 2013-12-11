@@ -1,3 +1,9 @@
+DEPRECATED
+==========
+
+Use [device-mapper-test-suite](https://github.com/jthornber/device-mapper-test-suite) instead.
+
+
 Prerequisites
 =============
 
